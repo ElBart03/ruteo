@@ -13,35 +13,48 @@ html,body{height:100%;margin:0}
 body{background:var(--paper);color:var(--ink);font:15px/1.35 system-ui,sans-serif;display:flex;flex-direction:column;padding-top:env(safe-area-inset-top)}
 #st{font-size:12px;padding:7px 12px;background:var(--ink);color:#cbd5ee;min-height:30px}
 main{flex:1;min-height:0;position:relative}
-section{display:none;position:absolute;inset:0;overflow:auto;padding:12px}
-section.on{display:block}
+section{position:absolute;inset:0;overflow:auto;padding:12px;opacity:0;transform:translateY(15px);transition:opacity .4s cubic-bezier(.25,1,.5,1),transform .4s cubic-bezier(.25,1,.5,1);pointer-events:none;z-index:0}
+section.on{opacity:1;transform:translateY(0);pointer-events:auto;z-index:1}
 #cam{padding:0;overflow:hidden;background:#000}
 video{width:100%;height:100%;object-fit:cover;display:block}
-#box{position:absolute;border:2px solid var(--sig);box-shadow:0 0 0 9999px rgba(10,16,32,.6);touch-action:none;border-radius:6px}
+#box{position:absolute;border:2px solid var(--sig);box-shadow:0 0 0 9999px rgba(10,16,32,.6);touch-action:none;border-radius:6px;transition:border-color .3s}
 #hd{position:absolute;right:-8px;bottom:-8px;width:32px;height:32px;background:var(--sig);border-radius:50%;touch-action:none;border:3px solid var(--ink)}
-#shot{position:absolute;bottom:18px;left:50%;margin-left:-38px;width:76px;height:76px;border-radius:50%;border:5px solid #fff;background:var(--sig);z-index:2}
-#shot:active{transform:scale(.93)}
+#shot{position:absolute;bottom:24px;left:50%;margin-left:-43px;width:86px;height:86px;border-radius:50%;border:5px solid #fff;background:var(--sig);z-index:2;transition:transform .2s cubic-bezier(.25,1,.5,1),background .2s}
+#shot:active{transform:scale(.85)}
 nav{display:flex;background:var(--ink);padding-bottom:env(safe-area-inset-bottom)}
-nav button{flex:1;padding:14px 4px;background:none;border:0;border-top:3px solid transparent;color:#9fb0d6;font:inherit}
+nav button{flex:1;padding:18px 4px;background:none;border:0;border-top:3px solid transparent;color:#9fb0d6;font:inherit;font-size:16px;transition:color .3s,border-color .3s}
 nav button.on{color:var(--sig);border-top-color:var(--sig)}
 #bd{background:#D64545;color:#fff;border-radius:9px;padding:0 6px;font-size:11px}
 #bd:empty{display:none}
-.btn{display:block;width:100%;padding:13px;margin:0 0 8px;background:var(--ink);color:#fff;border:0;border-radius:10px;text-align:center;font:600 15px system-ui;text-decoration:none}
+.btn{display:block;width:100%;padding:16px;margin:0 0 8px;background:var(--ink);color:#fff;border:0;border-radius:14px;text-align:center;font:600 16px system-ui;text-decoration:none;transition:transform .2s,background .2s}
+.btn:active{transform:scale(.96)}
 .btn.g{background:#fff;color:var(--ink);border:1px solid #c5cde0}
-.it{display:flex;gap:8px;align-items:center;background:#fff;border:1px solid #d5dbea;border-radius:10px;padding:8px;margin-bottom:8px}
-.it img{width:64px;border-radius:6px;border:1px solid #d5dbea}
+@keyframes slideIn{from{opacity:0;transform:translateY(15px)}to{opacity:1;transform:translateY(0)}}
+.it{display:flex;gap:8px;align-items:center;background:#fff;border:1px solid #d5dbea;border-radius:14px;padding:12px;margin-bottom:8px;animation:slideIn .4s cubic-bezier(.25,1,.5,1);transition:transform .2s}
+.it img{width:72px;border-radius:6px;border:1px solid #d5dbea;cursor:pointer;transition:transform .2s}
+.it img:active{transform:scale(.9)}
 .it>div{flex:1;min-width:0}
-input:not([type=checkbox]){width:100%;padding:9px;border-radius:8px;border:1px solid #b8c2dc;background:var(--paper);color:var(--ink);font:inherit}
-input[type=checkbox]{width:22px;height:22px;accent-color:var(--ink)}
-.it button{background:none;border:0;color:var(--mut);font-size:18px;padding:6px}
+input:not([type=checkbox]){width:100%;padding:14px;border-radius:12px;border:1px solid #b8c2dc;background:var(--paper);color:var(--ink);font:inherit;font-size:16px;transition:border-color .3s}
+input[type=checkbox]{width:28px;height:28px;accent-color:var(--ink)}
+.it button{background:none;border:0;color:var(--mut);font-size:24px;padding:12px}
 small{display:block;margin-top:3px;color:var(--mut)}small.ok{color:var(--ok)}small.fail{color:var(--warn)}
 .mut{color:var(--mut)}
+#pop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:999;align-items:center;justify-content:center;opacity:0;transition:opacity .3s;backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px)}
+#pop.on{opacity:1}
+#pop img{max-width:90%;max-height:90%;border-radius:16px;transform:scale(.8);transition:transform .4s cubic-bezier(.25,1,.5,1);box-shadow:0 10px 30px rgba(0,0,0,.5)}
+#pop.on img{transform:scale(1)}
+.acts{display:flex;gap:8px;margin-top:8px}
+.acts a{flex:1;text-align:center;font-size:15px;padding:12px;border-radius:12px;text-decoration:none;font-weight:600;transition:transform .2s}
+.acts a:active{transform:scale(.95)}
+.acts a.wz{background:#33ccff;color:#000}
+.acts a.gm{background:#ea4335;color:#fff}
 </style></head><body>
 <div id="st">Arrastra el recuadro; la esquina amarilla cambia su tamaño</div>
 <main>
 <section id="cam" class="on"><video playsinline autoplay muted></video><div id="box"><div id="hd"></div></div><button id="shot" aria-label="Tomar foto"></button></section>
 <section id="lst"></section>
 <section id="dst"></section>
+<div id="pop" onclick="this.classList.remove('on');setTimeout(()=>this.style.display='none',300)"><img id="popi"></div>
 </main>
 <nav><button data-t="cam" class="on">Cámara</button><button data-t="lst">Lista <b id="bd"></b></button><button data-t="dst">Distritos</button></nav>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/tesseract.min.js"></script>
@@ -56,6 +69,7 @@ let streets=LS('streets',['Álvarez Calderón','Juan Dellepiani']); // ejemplos 
 let items=LS('items',[]).map(i=>i.st=='cola'||i.st=='lee'?{...i,st:'fail',msg:'Interrumpida, escribe la dirección'}:i);
 let box=LS('box',null),jobs=[],busy=0,wk;
 const save=()=>SV('items',items.map(({id,st,th,addr,msg})=>({id,st,th,addr,msg})));
+const pop=s=>{$('#popi').src=s;$('#pop').style.display='flex';setTimeout(()=>$('#pop').classList.add('on'),10)};
 
 // ---- PWA (manifest e íconos generados) ----
 const mk=s=>{const c=document.createElement('canvas');c.width=c.height=s;const g=c.getContext('2d');g.fillStyle='#14213D';g.fillRect(0,0,s,s);g.font=s*.6+'px serif';g.textAlign='center';g.fillText('📍',s/2,s*.7);return c.toDataURL()};
@@ -127,7 +141,7 @@ function render(){if(document.activeElement?.matches('#lst input')){setTimeout(r
  $('#bd').textContent=items.filter(i=>i.st=='cola'||i.st=='lee').length||'';
  const us=urls(),lab={cola:'En cola',lee:'Leyendo…',ok:'Detectada',fail:''};
  $('#lst').innerHTML=(us.map((u,i)=>`<a class="btn" href="${u}" target="_blank" rel="noopener">Abrir ruta${us.length>1?' '+(i+1)+' de '+us.length:''} en Google Maps</a>`).join('')||'<p class="mut">Aún no hay direcciones. Toma una foto en la pestaña Cámara.</p>')
- +items.map(i=>{const w=i.st=='cola'||i.st=='lee';return `<div class="it"><img src="${i.th}" alt=""><div><input data-id="${i.id}" value="${(i.addr||'').replace(/"/g,'&quot;')}" placeholder="${w?lab[i.st]:'Escribe la dirección'}" ${w?'disabled':''}><small class="${i.st}">${i.st=='fail'?i.msg||'Sin datos':lab[i.st]}</small>${i.st=='ok'&&i.addr?`<a href="https://waze.com/ul?q=${encodeURIComponent(i.addr+', Lima, Perú')}&navigate=yes" target="_blank" style="display:inline-block;margin-top:4px;font-size:12px;color:#000;background:#33ccff;padding:3px 8px;border-radius:4px;text-decoration:none;font-weight:600">Ir en Waze</a>`:''}</div><button data-del="${i.id}" aria-label="Quitar">✕</button></div>`}).join('')
+ +items.map(i=>{const w=i.st=='cola'||i.st=='lee';return `<div class="it"><img src="${i.th}" alt="" onclick="pop(this.src)"><div><input data-id="${i.id}" value="${(i.addr||'').replace(/"/g,'&quot;')}" placeholder="${w?lab[i.st]:'Escribe la dirección'}" ${w?'disabled':''}><small class="${i.st}">${i.st=='fail'?i.msg||'Sin datos':lab[i.st]}</small>${i.st=='ok'&&i.addr?`<div class="acts"><a class="wz" href="https://waze.com/ul?q=${encodeURIComponent(i.addr+', Lima, Perú')}&navigate=yes" target="_blank">Waze</a><a class="gm" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(i.addr+', Lima, Perú')}" target="_blank">Maps</a></div>`:''}</div><button data-del="${i.id}" aria-label="Quitar">✕</button></div>`}).join('')
  +(items.length?'<button class="btn g" data-clr="1">Limpiar lista</button>':'')}
 $('#lst').addEventListener('change',e=>{const i=items.find(x=>x.id==e.target.dataset.id);if(!i)return;const v=e.target.value.trim();i.addr=v;i.st=v?'ok':'fail';i.msg='Escribe la dirección';if(v)learn(v);save();render()});
 $('#lst').addEventListener('click',e=>{const d=e.target.dataset;
@@ -143,5 +157,22 @@ $('#dst').addEventListener('click',e=>{const d=e.target.dataset;
  if(d.x!=null){dist.splice(d.x,1);SV('dist',dist);rd()}
  if(e.target.id=='ad'){const v=clean($('#nd').value);if(v&&!dist.some(x=>norm(x.n)==norm(v))){dist.push({n:TC(v),on:1});SV('dist',dist)}rd()}});
 
-cam();render();rd();layout();addEventListener('resize',layout);
+// ---- Detección de cámara estable ----
+let lD=null,sty=0;
+function chk(){
+ if(!$('video').videoWidth||!$('#cam').classList.contains('on'))return setTimeout(chk,250);
+ const c=document.createElement('canvas');c.width=c.height=32;
+ const g=c.getContext('2d',{willReadFrequently:true});g.drawImage($('video'),0,0,32,32);
+ const d=g.getImageData(0,0,32,32).data;let df=0;
+ if(lD){
+  for(let i=0;i<d.length;i+=4)df+=Math.abs(d[i]-lD[i])+Math.abs(d[i+1]-lD[i+1])+Math.abs(d[i+2]-lD[i+2]);
+  df/=(32*32*3);const is=df<8;
+  if(is&&!sty){navigator.vibrate?.(50);bx.style.borderColor='var(--ok)'}
+  else if(!is&&sty){bx.style.borderColor='var(--sig)'}
+  sty=is;
+ }
+ lD=d;setTimeout(chk,250);
+}
+
+cam();render();rd();layout();chk();addEventListener('resize',layout);
 </script></body></html>
