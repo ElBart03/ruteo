@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="es"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#14213D">
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
+<title>Scanner de Direcciones</title>
+<link rel="manifest" id="mf"><link rel="apple-touch-icon" id="ai">
+<style>
+:root{--ink:#14213D;--paper:#EEF1F7;--sig:#FFC800;--ok:#1B8A5A;--warn:#B45309;--mut:#5B6785}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0}
+body{background:var(--paper);color:var(--ink);font:15px/1.35 system-ui,sans-serif;display:flex;flex-direction:column;padding-top:env(safe-area-inset-top)}
+#st{font-size:12px;padding:7px 12px;background:var(--ink);color:#cbd5ee;min-height:30px}
+main{flex:1;min-height:0;position:relative}
+section{display:none;position:absolute;inset:0;overflow:auto;padding:12px}
+section.on{display:block}
+#cam{padding:0;overflow:hidden;background:#000}
+video{width:100%;height:100%;object-fit:cover;display:block}
+#box{position:absolute;border:2px solid var(--sig);box-shadow:0 0 0 9999px rgba(10,16,32,.6);touch-action:none;border-radius:6px}
+#hd{position:absolute;right:-8px;bottom:-8px;width:32px;height:32px;background:var(--sig);border-radius:50%;touch-action:none;border:3px solid var(--ink)}
+#shot{position:absolute;bottom:18px;left:50%;margin-left:-38px;width:76px;height:76px;border-radius:50%;border:5px solid #fff;background:var(--sig);z-index:2}
+#shot:active{transform:scale(.93)}
+nav{display:flex;background:var(--ink);padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;padding:14px 4px;background:none;border:0;border-top:3px solid transparent;color:#9fb0d6;font:inherit}
+nav button.on{color:var(--sig);border-top-color:var(--sig)}
+#bd{background:#D64545;color:#fff;border-radius:9px;padding:0 6px;font-size:11px}
+#bd:empty{display:none}
+.btn{display:block;width:100%;padding:13px;margin:0 0 8px;background:var(--ink);color:#fff;border:0;border-radius:10px;text-align:center;font:600 15px system-ui;text-decoration:none}
+.btn.g{background:#fff;color:var(--ink);border:1px solid #c5cde0}
+.it{display:flex;gap:8px;align-items:center;background:#fff;border:1px solid #d5dbea;border-radius:10px;padding:8px;margin-bottom:8px}
+.it img{width:64px;border-radius:6px;border:1px solid #d5dbea}
+.it>div{flex:1;min-width:0}
+input:not([type=checkbox]){width:100%;padding:9px;border-radius:8px;border:1px solid #b8c2dc;background:var(--paper);color:var(--ink);font:inherit}
+input[type=checkbox]{width:22px;height:22px;accent-color:var(--ink)}
+.it button{background:none;border:0;color:var(--mut);font-size:18px;padding:6px}
+small{display:block;margin-top:3px;color:var(--mut)}small.ok{color:var(--ok)}small.fail{color:var(--warn)}
+.mut{color:var(--mut)}
+</style></head><body>
+<div id="st">Arrastra el recuadro; la esquina amarilla cambia su tamaño</div>
+<main>
+<section id="cam" class="on"><video playsinline autoplay muted></video><div id="box"><div id="hd"></div></div><button id="shot" aria-label="Tomar foto"></button></section>
+<section id="lst"></section>
+<section id="dst"></section>
+</main>
+<nav><button data-t="cam" class="on">Cámara</button><button data-t="lst">Lista <b id="bd"></b></button><button data-t="dst">Distritos</button></nav>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/tesseract.min.js"></script>
+<script>
+const $=s=>document.querySelector(s),st=t=>$('#st').textContent=t,cl=(v,a,b)=>Math.max(a,Math.min(b,v));
+const LS=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}},SV=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch{}};
+const norm=s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
+const clean=s=>s.replace(/\s+/g,' ').replace(/^[\s.'-]+|[\s.'-]+$/g,'');
+const TC=s=>s.toLowerCase().replace(/[^\s.'-]+/g,(w,i)=>i&&/^(de|del|la|las|los|y)$/.test(w)?w:w[0].toUpperCase()+w.slice(1));
+let dist=LS('dist',[{n:'San Isidro',on:1},{n:'Miraflores',on:0},{n:'Magdalena',on:0}]);
+let streets=LS('streets',['Álvarez Calderón','Juan Dellepiani']); // ejemplos base; aprende de tus correcciones
+let items=LS('items',[]).map(i=>i.st=='cola'||i.st=='lee'?{...i,st:'fail',msg:'Interrumpida, escribe la dirección'}:i);
+let box=LS('box',null),jobs=[],busy=0,wk;
+const save=()=>SV('items',items.map(({id,st,th,addr,msg})=>({id,st,th,addr,msg})));
+
+// ---- PWA (manifest e íconos generados) ----
+const mk=s=>{const c=document.createElement('canvas');c.width=c.height=s;const g=c.getContext('2d');g.fillStyle='#14213D';g.fillRect(0,0,s,s);g.font=s*.6+'px serif';g.textAlign='center';g.fillText('📍',s/2,s*.7);return c.toDataURL()};
+$('#mf').href=URL.createObjectURL(new Blob([JSON.stringify({name:'Scanner de Direcciones',short_name:'Direcciones',start_url:location.href.split('#')[0],display:'standalone',background_color:'#14213D',theme_color:'#14213D',icons:[192,512].map(s=>({src:mk(s),sizes:s+'x'+s,type:'image/png'}))})],{type:'application/manifest+json'}));
+$('#ai').href=mk(180);
+if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js').catch(()=>{});
+
+// ---- Pestañas ----
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{document.querySelectorAll('nav button,section').forEach(e=>e.classList.remove('on'));b.classList.add('on');$('#'+b.dataset.t).classList.add('on');if(b.dataset.t=='cam')layout()});
+
+// ---- Cámara y recuadro ajustable ----
+const stage=$('#cam'),bx=$('#box');
+async function cam(){try{$('video').srcObject=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}},audio:false})}catch(e){st('Sin cámara (requiere HTTPS y permiso): '+e.message)}}
+function layout(){const W=stage.clientWidth,H=stage.clientHeight;if(!W)return;
+ if(!box){const s=Math.min(W,H)*.6;box={x:(W-s)/2/W,y:(H-s)/2/H,w:s/W,h:s/H}}
+ Object.assign(bx.style,{left:box.x*W+'px',top:box.y*H+'px',width:box.w*W+'px',height:box.h*H+'px'})}
+function drag(el,fn){el.addEventListener('pointerdown',e=>{e.stopPropagation();e.preventDefault();el.setPointerCapture(e.pointerId);let px=e.clientX,py=e.clientY;
+ const mv=v=>{fn(v.clientX-px,v.clientY-py,stage.clientWidth,stage.clientHeight);px=v.clientX;py=v.clientY;layout()};
+ const up=()=>{el.removeEventListener('pointermove',mv);el.removeEventListener('pointerup',up);SV('box',box)};
+ el.addEventListener('pointermove',mv);el.addEventListener('pointerup',up)})}
+drag(bx,(dx,dy,W,H)=>{box.x=cl(box.x+dx/W,0,1-box.w);box.y=cl(box.y+dy/H,0,1-box.h)});
+drag($('#hd'),(dx,dy,W,H)=>{box.w=cl(box.w+dx/W,.1,1-box.x);box.h=cl(box.h+dy/H,.05,1-box.y)});
+
+// ---- Captura: recorta solo el recuadro y lo manda a la cola ----
+$('#shot').onclick=()=>{const v=$('video');if(!v.videoWidth)return st('La cámara aún no está lista');
+ const W=stage.clientWidth,H=stage.clientHeight,vw=v.videoWidth,vh=v.videoHeight,s=Math.max(W/vw,H/vh),ox=(vw*s-W)/2,oy=(vh*s-H)/2;
+ const sx=(box.x*W+ox)/s,sy=(box.y*H+oy)/s,sw=box.w*W/s,sh=box.h*H/s,tw=Math.round(cl(sw,1500,2200)),k=tw/sw;
+ const c=document.createElement('canvas');c.width=tw;c.height=Math.round(sh*k);c.getContext('2d',{willReadFrequently:true}).drawImage(v,sx,sy,sw,sh,0,0,c.width,c.height);
+ const t=document.createElement('canvas');t.width=160;t.height=Math.max(20,Math.round(160*sh/sw));t.getContext('2d').drawImage(c,0,0,t.width,t.height);
+ const it={id:Date.now(),st:'cola',th:t.toDataURL('image/jpeg',.6),addr:''};
+ jobs.push({it,c});items.unshift(it);save();render();run();navigator.vibrate?.(30);st('Foto en cola: '+jobs.length+' por leer')};
+
+// Canal rojo: los sellos rojos desaparecen y la tinta oscura queda; luego se estira el contraste
+function pre(c){const g=c.getContext('2d'),d=g.getImageData(0,0,c.width,c.height),a=d.data,h=new Uint32Array(256),n=a.length/4;
+ for(let i=0;i<a.length;i+=4)h[a[i]]++;
+ let s=0,lo=0,hi=255;for(let i=0;i<256;i++){s+=h[i];if(s>n*.01){lo=i;break}}
+ s=0;for(let i=255;i>=0;i--){s+=h[i];if(s>n*.4){hi=i;break}}
+ if(hi<lo+10)hi=lo+10;
+ for(let i=0;i<a.length;i+=4){a[i]=a[i+1]=a[i+2]=cl((a[i]-lo)*255/(hi-lo),0,255)}
+ g.putImageData(d,0,0)}
+
+// ---- Cola OCR en segundo plano (una foto a la vez, mientras sigues capturando) ----
+async function run(){if(busy)return;busy=1;
+ try{while(jobs.length){const{it,c}=jobs[0];it.st='lee';render();
+  try{if(!wk){st('Cargando motor de lectura (la 1ª vez tarda)…');wk=await Tesseract.createWorker('spa',1,{logger:m=>m.status=='recognizing text'&&st('Leyendo… '+Math.round(m.progress*100)+'% · quedan '+jobs.length)});await wk.setParameters({tessedit_pageseg_mode:'6'})}
+   pre(c);const{data}=await wk.recognize(c);apply(it,data.text)}
+  catch(e){it.st='fail';it.msg='Error de lectura: '+e.message}
+  jobs.shift();save();render()}}
+ finally{busy=0;st('Listo')}}
+
+// ---- Interpretación: calle + número + distrito activo ----
+const RX=/\b(avenida|av\.?|calle|jir[oó]n|jr\.?|pasaje|psje\.?|pje\.?|malec[oó]n|alameda|prolongaci[oó]n|prol\.?)\s+([A-Za-zÁÉÍÓÚÜÑáéíóúüñ.'\s-]{2,45}?)\s+(\d{1,5})\b/i;
+const TN=t=>{t=norm(t);return /^av/.test(t)?'Avenida':/^j/.test(t)?'Jirón':/^p[sja]/.test(t)?'Pasaje':/^mal/.test(t)?'Malecón':/^ala/.test(t)?'Alameda':/^pro/.test(t)?'Prolongación':'Calle'};
+function lev(a,b){const m=[...Array(b.length+1).keys()];for(let i=1;i<=a.length;i++){let p=m[0];m[0]=i;for(let j=1;j<=b.length;j++){const t=m[j];m[j]=Math.min(m[j]+1,m[j-1]+1,p+(a[i-1]==b[j-1]?0:1));p=t}}return m[b.length]}
+function fix(n){const x=norm(n);let best=null,bd=.28;for(const s of streets){const y=norm(s),d=lev(x,y)/Math.max(x.length,y.length);if(d<bd){bd=d;best=s}}return best||TC(n)}
+const fail=(it,m)=>{it.st='fail';it.msg=m};
+function apply(it,txt){const T=norm(txt),m=txt.match(RX),D=dist.filter(d=>d.on&&T.includes(norm(d.n))).sort((a,b)=>b.n.length-a.n.length);it.addr='';
+ if(!m)return fail(it,'No detecté calle y número');
+ if(!D.length)return fail(it,'Distrito no activo o no detectado');
+ const n=clean(m[2]);if(norm(n).length<3)return fail(it,'Nombre de calle dudoso');
+ it.addr=`${TN(m[1])} ${fix(n)} ${m[3]}, ${D[0].n}`;it.st='ok';it.msg=''}
+function learn(v){const m=v.match(RX);if(!m)return;const n=TC(clean(m[2]));if(n.length>2&&!streets.some(s=>norm(s)==norm(n))){streets.push(n);SV('streets',streets)}}
+
+// ---- Lista y ruta de Google Maps ----
+function urls(){const L=items.filter(i=>i.st=='ok'&&i.addr).map(i=>i.addr+', Lima, Perú').reverse(),q=encodeURIComponent,u=[];
+ for(let i=0;i<L.length;i+=10){const c=L.slice(i,i+10);u.push('https://www.google.com/maps/dir/?api=1&travelmode=driving'+(i?'&origin='+q(L[i-1]):'')+'&destination='+q(c[c.length-1])+(c.length>1?'&waypoints='+q(c.slice(0,-1).join('|')):''))}
+ return u}
+function render(){if(document.activeElement?.matches('#lst input')){setTimeout(render,900);return}
+ $('#bd').textContent=items.filter(i=>i.st=='cola'||i.st=='lee').length||'';
+ const us=urls(),lab={cola:'En cola',lee:'Leyendo…',ok:'Detectada',fail:''};
+ $('#lst').innerHTML=(us.map((u,i)=>`<a class="btn" href="${u}" target="_blank" rel="noopener">Abrir ruta${us.length>1?' '+(i+1)+' de '+us.length:''} en Google Maps</a>`).join('')||'<p class="mut">Aún no hay direcciones. Toma una foto en la pestaña Cámara.</p>')
+ +items.map(i=>{const w=i.st=='cola'||i.st=='lee';return `<div class="it"><img src="${i.th}" alt=""><div><input data-id="${i.id}" value="${(i.addr||'').replace(/"/g,'&quot;')}" placeholder="${w?lab[i.st]:'Escribe la dirección'}" ${w?'disabled':''}><small class="${i.st}">${i.st=='fail'?i.msg||'Sin datos':lab[i.st]}</small></div><button data-del="${i.id}" aria-label="Quitar">✕</button></div>`}).join('')
+ +(items.length?'<button class="btn g" data-clr="1">Limpiar lista</button>':'')}
+$('#lst').addEventListener('change',e=>{const i=items.find(x=>x.id==e.target.dataset.id);if(!i)return;const v=e.target.value.trim();i.addr=v;i.st=v?'ok':'fail';i.msg='Escribe la dirección';if(v)learn(v);save();render()});
+$('#lst').addEventListener('click',e=>{const d=e.target.dataset;
+ if(d.del){items=items.filter(x=>x.id!=d.del);save();render()}
+ if(d.clr&&confirm('¿Borrar toda la lista?')){items=[];jobs.splice(busy?1:0);save();render()}});
+
+// ---- Distritos ----
+function rd(){$('#dst').innerHTML='<p class="mut">Solo se aceptan direcciones cuyo texto mencione un distrito marcado.</p>'
+ +dist.map((d,i)=>`<label class="it"><input type="checkbox" data-i="${i}" ${d.on?'checked':''}><span style="flex:1">${d.n}</span><button data-x="${i}" aria-label="Quitar">✕</button></label>`).join('')
+ +'<div class="it"><input id="nd" placeholder="Nuevo distrito, ej. Jesús María"><button id="ad" class="btn" style="width:auto;margin:0">Añadir</button></div>'}
+$('#dst').addEventListener('change',e=>{if(e.target.dataset.i!=null){dist[e.target.dataset.i].on=e.target.checked?1:0;SV('dist',dist)}});
+$('#dst').addEventListener('click',e=>{const d=e.target.dataset;
+ if(d.x!=null){dist.splice(d.x,1);SV('dist',dist);rd()}
+ if(e.target.id=='ad'){const v=clean($('#nd').value);if(v&&!dist.some(x=>norm(x.n)==norm(v))){dist.push({n:TC(v),on:1});SV('dist',dist)}rd()}});
+
+cam();render();rd();layout();addEventListener('resize',layout);
+</script></body></html>
