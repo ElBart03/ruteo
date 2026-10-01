@@ -70,7 +70,7 @@ small{display:block;margin-top:4px;color:var(--mut);font-size:13px}small.ok{colo
 const $=s=>document.querySelector(s),st=t=>$('#st').textContent=t,cl=(v,a,b)=>Math.max(a,Math.min(b,v));
 const LS=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}},SV=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch{}};
 const norm=s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
-const clean=s=>s.replace(/\s+/g,' ').replace(/^[\s.'-]+|[\s.'-]+$/g,'');
+const clean=s=>s.replace(/[\r\n]+/g,' ').replace(/\s+/g,' ').replace(/^[\s.'-]+|[\s.'-]+$/g,'');
 const TC=s=>s.toLowerCase().replace(/[^\s.'-]+/g,(w,i)=>i&&/^(de|del|la|las|los|y)$/.test(w)?w:w[0].toUpperCase()+w.slice(1));
 let dist=LS('dist',[{n:'San Isidro',on:1},{n:'Miraflores',on:0},{n:'Magdalena',on:0}]);
 let streets=LS('streets',['Álvarez Calderón','Juan Dellepiani']); // ejemplos base; aprende de tus correcciones
@@ -144,17 +144,19 @@ async function run(){if(busy)return;busy=1;
  finally{busy=0;st('Listo')}}
 
 // ---- Interpretación: calle + número + distrito activo ----
-const RX=/(?:\b(avenida|av\.?|calle|jir[oó]n|jr\.?|pasaje|psje\.?|pje\.?|malec[oó]n|alameda|prolongaci[oó]n|prol\.?)\s+)?([A-Za-zÁÉÍÓÚÜÑáéíóúüñ.' -]{2,45}?)\s+(\d{1,5})\b/i;
+const RX_FULL=/\b(avenida|av\.?|calle|jir[oó]n|jr\.?|pasaje|psje\.?|pje\.?|malec[oó]n|alameda|prolongaci[oó]n|prol\.?)\s+([A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9.' \n-]{3,60}?)\s+(\d{1,5})\b/i;
+const RX_FALL=/(?:^|\n)\s*([A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9.' -]{5,60}?)\s+(\d{1,5})\b/i;
 const TN=t=>{if(!t)return 'Calle';t=norm(t);return /^av/.test(t)?'Avenida':/^j/.test(t)?'Jirón':/^p[sja]/.test(t)?'Pasaje':/^mal/.test(t)?'Malecón':/^ala/.test(t)?'Alameda':/^pro/.test(t)?'Prolongación':'Calle'};
 function lev(a,b){const m=[...Array(b.length+1).keys()];for(let i=1;i<=a.length;i++){let p=m[0];m[0]=i;for(let j=1;j<=b.length;j++){const t=m[j];m[j]=Math.min(m[j]+1,m[j-1]+1,p+(a[i-1]==b[j-1]?0:1));p=t}}return m[b.length]}
 function fix(n){const x=norm(n);let best=null,bd=.28;for(const s of streets){const y=norm(s),d=lev(x,y)/Math.max(x.length,y.length);if(d<bd){bd=d;best=s}}return best||TC(n)}
 const fail=(it,m)=>{it.st='fail';it.msg=m};
-function apply(it,txt){const T=norm(txt),m=txt.match(RX),D=dist.filter(d=>d.on&&T.includes(norm(d.n))).sort((a,b)=>b.n.length-a.n.length);it.addr='';
- if(!m)return fail(it,'No detecté calle y número');
+function apply(it,txt){const T=norm(txt),D=dist.filter(d=>d.on&&T.includes(norm(d.n))).sort((a,b)=>b.n.length-a.n.length);it.addr='';
  if(!D.length)return fail(it,'Distrito no activo o no detectado');
- const n=clean(m[2]);if(norm(n).length<3)return fail(it,'Nombre de calle dudoso');
- it.addr=`${TN(m[1])} ${fix(n)} ${m[3]}, ${D[0].n}`;it.st='ok';it.msg=''}
-function learn(v){const m=v.match(RX);if(!m)return;const n=TC(clean(m[2]));if(n.length>2&&!streets.some(s=>norm(s)==norm(n))){streets.push(n);SV('streets',streets)}}
+ let m=txt.match(RX_FULL),t,n,num;
+ if(m){t=m[1];n=m[2];num=m[3]}else{m=txt.match(RX_FALL);if(!m)return fail(it,'No detecté calle y número');t='';n=m[1];num=m[2]}
+ n=clean(n);if(norm(n).length<3)return fail(it,'Nombre de calle dudoso');
+ it.addr=`${TN(t)} ${fix(n)} ${num}, ${D[0].n}`;it.st='ok';it.msg=''}
+function learn(v){let m=v.match(RX_FULL),n;if(m)n=m[2];else{m=v.match(RX_FALL);if(m)n=m[1]}if(!n)return;n=TC(clean(n));if(n.length>2&&!streets.some(s=>norm(s)==norm(n))){streets.push(n);SV('streets',streets)}}
 
 // ---- Lista y ruta de Google Maps ----
 function urls(){const L=items.filter(i=>i.st=='ok'&&i.addr).map(i=>i.addr+', Lima, Perú').reverse(),q=encodeURIComponent,u=[];
